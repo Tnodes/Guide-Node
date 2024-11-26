@@ -1,22 +1,19 @@
 #!/bin/bash
 
-# Remove previous files
+# Clean up old files
 rm -rf blockmesh-cli.tar.gz target
 
 # Update and upgrade
 apt update && apt upgrade -y
 
-# Install necessary packages
-apt-get install -y \
-    ca-certificates \
-    curl \
-    gnupg \
-    lsb-release \
-    jq
-
 # Install Docker if not installed
 if ! command -v docker &> /dev/null; then
     echo "Installing Docker..."
+    apt-get install -y \
+        ca-certificates \
+        curl \
+        gnupg \
+        lsb-release
     curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
     apt-get update && apt-get install -y docker-ce docker-ce-cli containerd.io
@@ -32,22 +29,27 @@ chmod +x /usr/local/bin/docker-compose
 # Create target directory for extraction
 mkdir -p target/release
 
-# Fetch the latest release information from GitHub API
-echo "Fetching the latest release information..."
+# Fetch the latest release version from GitHub API
+echo "Fetching the latest release version..."
 release_info=$(curl -s https://api.github.com/repos/block-mesh/block-mesh-monorepo/releases/latest)
+version=$(echo "$release_info" | jq -r '.tag_name')
 
-# Extract the download URL for the blockmesh-cli asset
-download_url=$(echo "$release_info" | jq -r '.assets[] | select(.name | test("blockmesh-cli-x86_64-unknown-linux-gnu.tar.gz")) | .browser_download_url')
-
-# Check if the download URL was found
-if [[ -z "$download_url" ]]; then
-    echo "Error: Unable to find the download URL for blockmesh-cli. Exiting..."
+if [[ -z "$version" ]]; then
+    echo "Error: Unable to fetch the latest version. Exiting..."
     exit 1
 fi
 
+echo "Latest version: $version"
+
 # Download and extract BlockMesh CLI
-echo "Downloading and extracting BlockMesh CLI from $download_url..."
+echo "Downloading and extracting BlockMesh CLI version $version..."
+download_url="https://github.com/block-mesh/block-mesh-monorepo/releases/download/$version/blockmesh-cli-x86_64-unknown-linux-gnu.tar.gz"
 curl -L "$download_url" -o blockmesh-cli.tar.gz
+
+# Verify the downloaded file type
+file blockmesh-cli.tar.gz | grep -q "gzip compressed data" || { echo "Downloaded file is not a valid gzip archive. Exiting..."; exit 1; }
+
+# Extract the file
 tar -xzf blockmesh-cli.tar.gz --strip-components=3 -C target/release
 
 # Verify extraction
