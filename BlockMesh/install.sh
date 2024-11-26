@@ -6,6 +6,14 @@ rm -rf blockmesh-cli.tar.gz target
 # Update and upgrade
 apt update && apt upgrade -y
 
+# Install jq if not installed
+if ! command -v jq &> /dev/null; then
+    echo "Installing jq..."
+    apt-get install -y jq
+else
+    echo "jq is already installed, skipping..."
+fi
+
 # Install Docker if not installed
 if ! command -v docker &> /dev/null; then
     echo "Installing Docker..."
