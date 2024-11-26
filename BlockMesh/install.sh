@@ -1,5 +1,18 @@
 #!/bin/bash
 
+# Function to fetch the latest release info
+fetch_latest_release() {
+    echo "Fetching the latest release information..."
+    LATEST_RELEASE=$(curl -s https://api.github.com/repos/block-mesh/block-mesh-monorepo/releases/latest)
+    echo $LATEST_RELEASE
+}
+
+# Function to parse JSON for download URL
+get_download_url() {
+    echo "$1" | grep "browser_download_url" | grep "blockmesh-cli-x86_64-unknown-linux-gnu.tar.gz" | cut -d '"' -f 4
+}
+
+# Remove previous files
 rm -rf blockmesh-cli.tar.gz target
 
 # Update and upgrade
@@ -31,9 +44,18 @@ chmod +x /usr/local/bin/docker-compose
 # Create target directory for extraction
 mkdir -p target/release
 
+# Fetch the latest release and parse the download URL
+LATEST_RELEASE=$(fetch_latest_release)
+DOWNLOAD_URL=$(get_download_url "$LATEST_RELEASE")
+
+if [[ -z "$DOWNLOAD_URL" ]]; then
+    echo "Error: Unable to find download URL for the latest release. Exiting..."
+    exit 1
+fi
+
 # Download and extract BlockMesh CLI
-echo "Downloading and extracting BlockMesh CLI..."
-curl -L https://github.com/block-mesh/block-mesh-monorepo/releases/download/v0.0.390/blockmesh-cli-x86_64-unknown-linux-gnu.tar.gz -o blockmesh-cli.tar.gz
+echo "Downloading and extracting BlockMesh CLI from $DOWNLOAD_URL..."
+curl -L "$DOWNLOAD_URL" -o blockmesh-cli.tar.gz
 tar -xzf blockmesh-cli.tar.gz --strip-components=3 -C target/release
 
 # Verify extraction
