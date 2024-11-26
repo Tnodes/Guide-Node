@@ -1,34 +1,22 @@
 #!/bin/bash
 
-# Function to fetch the latest release info
-fetch_latest_release() {
-    echo "Fetching the latest release information..."
-    LATEST_RELEASE=$(curl -s https://api.github.com/repos/block-mesh/block-mesh-monorepo/releases/latest)
-    echo $LATEST_RELEASE
-}
-
-# Function to parse JSON for download URL
-get_download_url() {
-    echo "$1" | grep "browser_download_url" | grep "blockmesh-cli-x86_64-unknown-linux-gnu.tar.gz" | cut -d '"' -f 4
-}
-
 # Remove previous files
 rm -rf blockmesh-cli.tar.gz target
 
 # Update and upgrade
 apt update && apt upgrade -y
 
-# Cleanup previous files
-rm -rf blockmesh-cli.tar.gz target
+# Install necessary packages
+apt-get install -y \
+    ca-certificates \
+    curl \
+    gnupg \
+    lsb-release \
+    jq
 
 # Install Docker if not installed
 if ! command -v docker &> /dev/null; then
     echo "Installing Docker..."
-    apt-get install -y \
-        ca-certificates \
-        curl \
-        gnupg \
-        lsb-release
     curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
     apt-get update && apt-get install -y docker-ce docker-ce-cli containerd.io
@@ -44,18 +32,22 @@ chmod +x /usr/local/bin/docker-compose
 # Create target directory for extraction
 mkdir -p target/release
 
-# Fetch the latest release and parse the download URL
-LATEST_RELEASE=$(fetch_latest_release)
-DOWNLOAD_URL=$(get_download_url "$LATEST_RELEASE")
+# Fetch the latest release information from GitHub API
+echo "Fetching the latest release information..."
+release_info=$(curl -s https://api.github.com/repos/block-mesh/block-mesh-monorepo/releases/latest)
 
-if [[ -z "$DOWNLOAD_URL" ]]; then
-    echo "Error: Unable to find download URL for the latest release. Exiting..."
+# Extract the download URL for the blockmesh-cli asset
+download_url=$(echo "$release_info" | jq -r '.assets[] | select(.name | test("blockmesh-cli-x86_64-unknown-linux-gnu.tar.gz")) | .browser_download_url')
+
+# Check if the download URL was found
+if [[ -z "$download_url" ]]; then
+    echo "Error: Unable to find the download URL for blockmesh-cli. Exiting..."
     exit 1
 fi
 
 # Download and extract BlockMesh CLI
-echo "Downloading and extracting BlockMesh CLI from $DOWNLOAD_URL..."
-curl -L "$DOWNLOAD_URL" -o blockmesh-cli.tar.gz
+echo "Downloading and extracting BlockMesh CLI from $download_url..."
+curl -L "$download_url" -o blockmesh-cli.tar.gz
 tar -xzf blockmesh-cli.tar.gz --strip-components=3 -C target/release
 
 # Verify extraction
