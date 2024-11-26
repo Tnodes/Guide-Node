@@ -58,6 +58,12 @@ if [[ ! -f target/release/blockmesh-cli ]]; then
     exit 1
 fi
 
+# Check if the container is running and stop it
+if docker ps -q -f name=blockmesh-cli-container > /dev/null; then
+    echo "Stopping running container blockmesh-cli-container..."
+    docker stop blockmesh-cli-container
+fi
+
 # Prompt for email and password
 read -p "Enter your BlockMesh email: " email
 read -s -p "Enter your BlockMesh password: " password
